@@ -43,13 +43,8 @@ events =
 sliderDirective = ($timeout) ->
   restrict: 'E'
   scope:
-    floor:        '@'
-    ceiling:      '@'
     values:       '=?'
-    step:         '@'
     highlight:    '@'
-    precision:    '@'
-    buffer:       '@'
     ngModel:      '=?'
     change:       '&'
   template: '''
@@ -58,10 +53,8 @@ sliderDirective = ($timeout) ->
 '''
   compile: (element, attributes) ->
 
-    range = false
-
     # Scope values to watch for changes
-    watchables = ['floor', 'ceiling', 'values', 'ngModel']
+    watchables = ['values', 'ngModel']
 
     post: (scope, element, attributes) ->
       # Get references to template elements
@@ -70,22 +63,26 @@ sliderDirective = ($timeout) ->
 
       bound = false
       ngDocument = angularize document
-      handleHalfWidth = barWidth = minOffset = maxOffset = minValue = maxValue = valueRange = offsetRange = undefined
+      handleHalfWidth = undefined
+      barWidth = undefined
+      minOffset = undefined
+      maxOffset = undefined
+      valueRange = undefined
+      offsetRange = undefined
+
+      step = 1
+      floor = 0
+      precision = 0
+      ceiling = scope.values.length - 1
 
       dimensions = ->
-        # roundStep the initial score values
-        scope.step ?= 1
-        scope.floor ?= 0
-        scope.precision ?= 0
-        scope.ngModelLow = scope.ngModel unless range
-        scope.ceiling ?= scope.values.length - 1 if scope.values?.length
 
         for value in watchables
           scope[value] = roundStep(
             parseFloat(scope[value]),
-            parseInt(scope.precision),
-            parseFloat(scope.step),
-            parseFloat(scope.floor)
+            parseInt(precision),
+            parseFloat(step),
+            parseFloat(floor)
           ) if typeof value is 'number'
 
         # Commonly used measurements
@@ -95,10 +92,7 @@ sliderDirective = ($timeout) ->
         minOffset = 0
         maxOffset = barWidth - width(handle)
 
-        minValue = parseFloat scope.floor
-        maxValue = parseFloat scope.ceiling
-
-        valueRange = maxValue - minValue
+        valueRange = ceiling - floor
         offsetRange = maxOffset - minOffset
 
       updateDOM = ->
@@ -106,17 +100,17 @@ sliderDirective = ($timeout) ->
 
         # Translation functions
         percentOffset = (offset) -> contain ((offset - minOffset) / offsetRange) * 100
-        percentValue = (value) -> contain ((value - minValue) / valueRange) * 100
+        percentValue = (value) -> contain ((value - floor) / valueRange) * 100
         pixelsToOffset = (percent) -> pixelize percent * offsetRange / 100
 
         setPointers = ->
           newLowValue = percentValue scope['ngModel']
           offset handle, pixelsToOffset newLowValue
-          offset selection, pixelize(offsetLeft(handle) + handleHalfWidth)
 
           switch true
             when attributes.highlight is 'right'
               selection.css width: pixelsToOffset 110 - newLowValue
+              offset selection, pixelize(offsetLeft(handle) + handleHalfWidth)
             when attributes.highlight is 'left'
               selection.css width: pixelsToOffset newLowValue
               offset selection, 0
@@ -139,8 +133,8 @@ sliderDirective = ($timeout) ->
             newOffset = eventX - element[0].getBoundingClientRect().left - handleHalfWidth
             newOffset = Math.max(Math.min(newOffset, maxOffset), minOffset)
             newPercent = percentOffset newOffset
-            newValue = minValue + (valueRange * newPercent / 100.0)
-            newValue = roundStep(newValue, parseInt(scope.precision), parseFloat(scope.step), parseFloat(scope.floor))
+            newValue = floor + (valueRange * newPercent / 100.0)
+            newValue = roundStep(newValue, precision, step, floor)
             changed = scope[currentRef] != newValue
             scope.$apply()
             setPointers()
