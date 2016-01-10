@@ -50,10 +50,7 @@ sliderDirective = ($timeout) ->
     highlight:    '@'
     precision:    '@'
     buffer:       '@'
-    dragstop:     '@'
     ngModel:      '=?'
-    ngModelLow:   '=?'
-    ngModelHigh:  '=?'
     change:       '&'
   template: '''
     <div class="bar"><div class="selection"></div></div>
@@ -71,10 +68,6 @@ sliderDirective = ($timeout) ->
       [bar, handle] = (angularize(e) for e in element.children())
       selection = angularize bar.children()[0]
 
-      scope.local = {}
-      scope.local['ngModel'] = scope['ngModel']
-      scope.local['ngModelHigh'] = scope['ngModelHigh']
-
       bound = false
       ngDocument = angularize document
       handleHalfWidth = barWidth = minOffset = maxOffset = minValue = maxValue = valueRange = offsetRange = undefined
@@ -86,9 +79,6 @@ sliderDirective = ($timeout) ->
         scope.precision ?= 0
         scope.ngModelLow = scope.ngModel unless range
         scope.ceiling ?= scope.values.length - 1 if scope.values?.length
-
-        scope.local['ngModel'] = scope['ngModel']
-        scope.local['ngModelHigh'] = scope['ngModelHigh']
 
         for value in watchables
           scope[value] = roundStep(
@@ -120,7 +110,7 @@ sliderDirective = ($timeout) ->
         pixelsToOffset = (percent) -> pixelize percent * offsetRange / 100
 
         setPointers = ->
-          newLowValue = percentValue scope.local['ngModel']
+          newLowValue = percentValue scope['ngModel']
           offset handle, pixelsToOffset newLowValue
           offset selection, pixelize(offsetLeft(handle) + handleHalfWidth)
 
@@ -138,9 +128,6 @@ sliderDirective = ($timeout) ->
             handle.removeClass 'active'
             ngDocument.unbind events.move
             ngDocument.unbind events.end
-            if scope.dragstop
-              scope['ngModelHigh'] = scope.local['ngModelHigh']
-              scope['ngModel'] = scope.local['ngModel']
             currentRef = ref
             scope.$apply()
 
@@ -153,35 +140,14 @@ sliderDirective = ($timeout) ->
             newOffset = Math.max(Math.min(newOffset, maxOffset), minOffset)
             newPercent = percentOffset newOffset
             newValue = minValue + (valueRange * newPercent / 100.0)
-            if range
-              switch currentRef
-                when 'ngModel'
-                  if newValue > scope.local['ngModelHigh']
-                    currentRef = 'ngModelHigh'
-                    handle.removeClass 'active'
-                    setPointers()
-                  else if scope.buffer > 0
-                    newValue = Math.min newValue,
-                      scope.local['ngModelHigh'] - scope.buffer
-                when 'ngModelHigh'
-                  if newValue < scope.local['ngModel']
-                    currentRef = 'ngModel'
-                    handle.addClass 'active'
-                    setPointers()
-                  else if scope.buffer > 0
-                    newValue = Math.max newValue,
-                      parseInt(scope.local['ngModel']) + parseInt(scope.buffer)
             newValue = roundStep(newValue, parseInt(scope.precision), parseFloat(scope.step), parseFloat(scope.floor))
-            changed = scope.dragstop and changed or scope.local[currentRef] != newValue
-            scope.local[currentRef] = newValue
+            changed = scope[currentRef] != newValue
             scope.$apply()
             setPointers()
+            scope[currentRef] = newValue
 
-            unless scope.dragstop
-              scope[currentRef] = newValue
-
-              if changed
-                scope.$eval scope.change
+            if changed
+              scope.$eval scope.change
 
           onStart = (event) ->
             dimensions()
