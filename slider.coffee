@@ -40,8 +40,6 @@ events =
     move:  'touchmove'
     end:   'touchend'
 
-# DIRECTIVE DEFINITION
-
 sliderDirective = ($timeout) ->
   restrict: 'E'
   scope:
@@ -59,36 +57,23 @@ sliderDirective = ($timeout) ->
     change:       '&'
   template: '''
     <div class="bar"><div class="selection"></div></div>
-    <div class="handle low"></div><div class="handle high"></div>
-    <div class="bubble limit low">{{ values.length ? values[floor || 0] : floor }}</div>
-    <div class="bubble limit high">{{ values.length ? values[ceiling || values.length - 1] : ceiling }}</div>
-    <div class="bubble value low">{{ values.length ? values[local.ngModelLow || local.ngModel || 0] : local.ngModelLow || local.ngModel || 0 }}</div>
-    <div class="bubble value high">{{ values.length ? values[local.ngModelHigh] : local.ngModelHigh }}</div>'''
+    <div class="handle low"></div>
+'''
   compile: (element, attributes) ->
 
-    # Check if it is a range slider
-    range = !attributes.ngModel? and attributes.ngModelLow? and attributes.ngModelHigh?
-
-    low = if range then 'ngModelLow' else 'ngModel'
-    high = 'ngModelHigh'
+    range = false
 
     # Scope values to watch for changes
-    watchables = ['floor', 'ceiling', 'values', low]
-    watchables.push high if range
+    watchables = ['floor', 'ceiling', 'values', 'ngModel']
 
     post: (scope, element, attributes) ->
       # Get references to template elements
-      [bar, minPtr, maxPtr, flrBub, ceilBub, lowBub, highBub] = (angularize(e) for e in element.children())
+      [bar, handle] = (angularize(e) for e in element.children())
       selection = angularize bar.children()[0]
 
-      # Remove range specific elements if not a range slider
-      unless range
-        upper.remove() for upper in [maxPtr, highBub]
-        selection.remove() unless attributes.highlight
-
       scope.local = {}
-      scope.local[low] = scope[low]
-      scope.local[high] = scope[high]
+      scope.local['ngModel'] = scope['ngModel']
+      scope.local['ngModelHigh'] = scope['ngModelHigh']
 
       bound = false
       ngDocument = angularize document
@@ -102,20 +87,23 @@ sliderDirective = ($timeout) ->
         scope.ngModelLow = scope.ngModel unless range
         scope.ceiling ?= scope.values.length - 1 if scope.values?.length
 
-        scope.local[low] = scope[low]
-        scope.local[high] = scope[high]
+        scope.local['ngModel'] = scope['ngModel']
+        scope.local['ngModelHigh'] = scope['ngModelHigh']
 
         for value in watchables
-          scope[value] = roundStep(parseFloat(scope[value]),
-            parseInt(scope.precision), parseFloat(scope.step),
-            parseFloat(scope.floor)) if typeof value is 'number'
+          scope[value] = roundStep(
+            parseFloat(scope[value]),
+            parseInt(scope.precision),
+            parseFloat(scope.step),
+            parseFloat(scope.floor)
+          ) if typeof value is 'number'
 
         # Commonly used measurements
-        handleHalfWidth = halfWidth minPtr
+        handleHalfWidth = halfWidth handle
         barWidth = width bar
 
         minOffset = 0
-        maxOffset = barWidth - width(minPtr)
+        maxOffset = barWidth - width(handle)
 
         minValue = parseFloat scope.floor
         maxValue = parseFloat scope.ceiling
@@ -132,35 +120,27 @@ sliderDirective = ($timeout) ->
         pixelsToOffset = (percent) -> pixelize percent * offsetRange / 100
 
         setPointers = ->
-          offset ceilBub, pixelize(barWidth - width(ceilBub))
-          newLowValue = percentValue scope.local[low]
-          offset minPtr, pixelsToOffset newLowValue
-          offset lowBub, pixelize(offsetLeft(minPtr) - (halfWidth lowBub) + handleHalfWidth)
-          offset selection, pixelize(offsetLeft(minPtr) + handleHalfWidth)
+          newLowValue = percentValue scope.local['ngModel']
+          offset handle, pixelsToOffset newLowValue
+          offset selection, pixelize(offsetLeft(handle) + handleHalfWidth)
 
           switch true
-            when range
-              newHighValue = percentValue scope.local[high]
-              offset maxPtr, pixelsToOffset newHighValue
-              offset highBub, pixelize(offsetLeft(maxPtr) - (halfWidth highBub) + handleHalfWidth)
-              selection.css width: pixelsToOffset newHighValue - newLowValue
             when attributes.highlight is 'right'
               selection.css width: pixelsToOffset 110 - newLowValue
             when attributes.highlight is 'left'
               selection.css width: pixelsToOffset newLowValue
               offset selection, 0
 
-        bind = (handle, bubble, ref, events) ->
+        bind = (handle, ref, events) ->
           currentRef = ref
           changed = false
           onEnd = ->
-            bubble.removeClass 'active'
             handle.removeClass 'active'
             ngDocument.unbind events.move
             ngDocument.unbind events.end
             if scope.dragstop
-              scope[high] = scope.local[high]
-              scope[low] = scope.local[low]
+              scope['ngModelHigh'] = scope.local['ngModelHigh']
+              scope['ngModel'] = scope.local['ngModel']
             currentRef = ref
             scope.$apply()
 
@@ -175,28 +155,22 @@ sliderDirective = ($timeout) ->
             newValue = minValue + (valueRange * newPercent / 100.0)
             if range
               switch currentRef
-                when low
-                  if newValue > scope.local[high]
-                    currentRef = high
-                    minPtr.removeClass 'active'
-                    lowBub.removeClass 'active'
-                    maxPtr.addClass 'active'
-                    highBub.addClass 'active'
+                when 'ngModel'
+                  if newValue > scope.local['ngModelHigh']
+                    currentRef = 'ngModelHigh'
+                    handle.removeClass 'active'
                     setPointers()
                   else if scope.buffer > 0
                     newValue = Math.min newValue,
-                      scope.local[high] - scope.buffer
-                when high
-                  if newValue < scope.local[low]
-                    currentRef = low
-                    maxPtr.removeClass 'active'
-                    highBub.removeClass 'active'
-                    minPtr.addClass 'active'
-                    lowBub.addClass 'active'
+                      scope.local['ngModelHigh'] - scope.buffer
+                when 'ngModelHigh'
+                  if newValue < scope.local['ngModel']
+                    currentRef = 'ngModel'
+                    handle.addClass 'active'
                     setPointers()
                   else if scope.buffer > 0
                     newValue = Math.max newValue,
-                      parseInt(scope.local[low]) + parseInt(scope.buffer)
+                      parseInt(scope.local['ngModel']) + parseInt(scope.buffer)
             newValue = roundStep(newValue, parseInt(scope.precision), parseFloat(scope.step), parseFloat(scope.floor))
             changed = scope.dragstop and changed or scope.local[currentRef] != newValue
             scope.local[currentRef] = newValue
@@ -211,7 +185,6 @@ sliderDirective = ($timeout) ->
 
           onStart = (event) ->
             dimensions()
-            bubble.addClass 'active'
             handle.addClass 'active'
             setPointers()
             event.stopPropagation()
@@ -222,8 +195,7 @@ sliderDirective = ($timeout) ->
 
         setBindings = ->
           for method in ['touch', 'mouse']
-            bind minPtr, lowBub, low, events[method]
-            bind maxPtr, highBub, high, events[method]
+            bind handle, 'ngModel', events[method]
           bound = true
 
         setBindings() unless bound
