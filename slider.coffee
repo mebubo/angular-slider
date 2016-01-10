@@ -53,11 +53,10 @@ sliderDirective = ($timeout) ->
 '''
   compile: (element, attributes) ->
 
-    # Scope values to watch for changes
-    watchables = ['values', 'ngModel']
-
     post: (scope, element, attributes) ->
-      # Get references to template elements
+
+      watchables = ['values', 'ngModel']
+
       [bar, handle] = (angularize(e) for e in element.children())
       selection = angularize bar.children()[0]
 
@@ -65,15 +64,15 @@ sliderDirective = ($timeout) ->
       ngDocument = angularize document
       handleHalfWidth = undefined
       barWidth = undefined
-      minOffset = undefined
+      minOffset = 0
       maxOffset = undefined
-      valueRange = undefined
       offsetRange = undefined
 
       step = 1
       floor = 0
       precision = 0
       ceiling = scope.values.length - 1
+      valueRange = ceiling - floor
 
       dimensions = ->
 
@@ -89,10 +88,7 @@ sliderDirective = ($timeout) ->
         handleHalfWidth = halfWidth handle
         barWidth = width bar
 
-        minOffset = 0
         maxOffset = barWidth - width(handle)
-
-        valueRange = ceiling - floor
         offsetRange = maxOffset - minOffset
 
       updateDOM = ->
@@ -116,13 +112,13 @@ sliderDirective = ($timeout) ->
               offset selection, 0
 
         bind = (handle, ref, events) ->
-          currentRef = ref
+
           changed = false
+
           onEnd = ->
             handle.removeClass 'active'
             ngDocument.unbind events.move
             ngDocument.unbind events.end
-            currentRef = ref
             scope.$apply()
 
             if changed
@@ -131,14 +127,14 @@ sliderDirective = ($timeout) ->
           onMove = (event) ->
             eventX = event.clientX or event.touches?[0].clientX or event.originalEvent?.changedTouches?[0].clientX or 0
             newOffset = eventX - element[0].getBoundingClientRect().left - handleHalfWidth
-            newOffset = Math.max(Math.min(newOffset, maxOffset), minOffset)
+            #newOffset = Math.max(Math.min(newOffset, maxOffset), minOffset)
             newPercent = percentOffset newOffset
             newValue = floor + (valueRange * newPercent / 100.0)
             newValue = roundStep(newValue, precision, step, floor)
-            changed = scope[currentRef] != newValue
+            changed = scope[ref] != newValue
+            scope[ref] = newValue
             scope.$apply()
             setPointers()
-            scope[currentRef] = newValue
 
             if changed
               scope.$eval scope.change
@@ -151,6 +147,7 @@ sliderDirective = ($timeout) ->
             event.preventDefault()
             ngDocument.bind events.move, onMove
             ngDocument.bind events.end, onEnd
+
           handle.bind events.start, onStart
 
         setBindings = ->
