@@ -46,7 +46,9 @@ sliderDirective = ($timeout) ->
     values:       '=?'
     highlight:    '@'
     ngModel:      '=?'
+    disabled:     '=?'
     change:       '&'
+    firstChange:  '&'
   template: '''
     <div class="bar"><div class="selection"></div></div>
     <div class="handle low"></div>
@@ -138,6 +140,9 @@ sliderDirective = ($timeout) ->
 
             if changed
               scope.$eval scope.change
+              if scope.disabled
+                scope.disabled = false
+                scope.$eval scope.firstChange
 
           onStart = (event) ->
             dimensions()
